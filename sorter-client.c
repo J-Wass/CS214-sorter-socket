@@ -11,10 +11,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <sys/sendfile.h>
 
 char * hostname;
 int port;
 int sortInt;
+int threadCount;
 
 int main(int argc, char ** argv){
   if(argc < 7){
@@ -106,15 +108,18 @@ int main(int argc, char ** argv){
        outDir);
       return 0;
   }
-  printf("port: %d, host: %s, inDir: %s, outdir: %s, sortcol: %d\n", port, hostname, inDir, outDir, sortInt);
-  sortCSVs(inputDir, inDir, outputDir, outDir);
+  //dont really need outputDir or outDir atm...
+  pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
+  threadCount = -1;
+  sortCSVs(inputDir, inDir, outputDir, outDir, threads, 1);
+  //create another socket request for the all-sorted.csv and write it to outdir now
   closedir(inputDir);
   closedir(outputDir);
-  free(hostname); //sorting int is found in mergesort.c
+  free(hostname);
   return 0;
 }
 
-void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir){
+void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthread_t * threads, short isMain){
   struct dirent* inFile;
   char * isSorted;
   while((inFile = readdir(inputDir)) != NULL){
@@ -135,8 +140,12 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir){
       strcat(path, name);
       strcat(path, "\0");
       pthread_t thr;
-      pthread_detach(thr);
+      printf("sorting %s\n", name);
       pthread_create (&thr, NULL, FileSortHandler, (void *)path);
+      threads[++threadCount] = thr;
+      printf("%d => %lu\n",threadCount, threads[threadCount]);
+
+
     }
     //DIRECTORY
     if(inFile->d_type == 4){
@@ -145,25 +154,61 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir){
       strcat(newDir, "/");
       strcat(newDir, name);
       DIR * open = opendir(newDir);
-      sortCSVs(open, newDir, outputDir, outDir);
+      sortCSVs(open, newDir, outputDir, outDir, threads, 0);
       closedir(open);
     }
+  }
+  //wait for all threads to be sent out
+  if(isMain){
+    printf("joining\n");
+    for(;threadCount >= 0; threadCount--){
+      printf("%d => %lu\n", threadCount, threads[threadCount]);
+      pthread_join(threads[threadCount], NULL);
+    }
+    int sockfd, portno;
+
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+    portno = port;
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0){
+        fprintf(stderr,"ERROR opening socket\n");
+    }
+    server = gethostbyname(hostname);
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host\n");
+        exit(0);
+    }
+
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr,
+         (char *)&serv_addr.sin_addr.s_addr,
+         server->h_length);
+    serv_addr.sin_port = htons(portno);
+    int conError = 0;
+    if ((conError == connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr))) < 0){
+        fprintf(stderr,"ERROR connecting %d\n", conError);
+    }
+    //send the all finished signal
+    int allFinished = -1;
+    write(sockfd,&allFinished,sizeof(int));
+    close(sockfd);
+
+    //read the length of the total sorted file
+    //now read the total sorted file
   }
   return;
 }
 
 void* FileSortHandler(void * filename){
   FILE * sortFile = fopen((char *)filename, "r");
-  char * line = NULL;
-  size_t nbytes = 0 * sizeof(char);
-
-  getline(&line, &nbytes, sortFile); //skip over first row (just the table headers)
   int sockfd, portno;
 
   struct sockaddr_in serv_addr;
   struct hostent *server;
   portno = port;
-  sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0){
       fprintf(stderr,"ERROR opening socket\n");
   }
@@ -172,23 +217,31 @@ void* FileSortHandler(void * filename){
       fprintf(stderr,"ERROR, no such host\n");
       exit(0);
   }
+
   bzero((char *) &serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   bcopy((char *)server->h_addr,
        (char *)&serv_addr.sin_addr.s_addr,
        server->h_length);
   serv_addr.sin_port = htons(portno);
-
-  if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0){
-      fprintf(stderr,"ERROR connecting\n");
+  int conError = 0;
+  if ((conError == connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr))) < 0){
+      fprintf(stderr,"ERROR connecting %d\n", conError);
   }
-  int pid = htonl((int)getpid());
-  printf("Sending %d\n",pid);
-  write(sockfd,&pid,sizeof(pid));
-  while (getline(&line, &nbytes, sortFile) != -1) {
-     write(sockfd, line,4);
-  }
+  int pid = getpid();
+  int sortingInt = sortInt;
+  fseek(sortFile, 0, SEEK_END);
+  long bufsize = ftell(sortFile);
+  fseek(sortFile, 0, SEEK_SET);
+  char * buffer = malloc(sizeof(char)*bufsize);
+  fread(buffer, bufsize, sizeof(char),sortFile);
+  printf("(%d) sending %s\n", pid, buffer);
+  write(sockfd,&pid,sizeof(pid)); //pid
+  write(sockfd,&sortingInt,sizeof(sortingInt)); //sort int
+  write(sockfd, &bufsize, sizeof(long)); //size of file
+  write(sockfd, buffer, bufsize); //file
   fclose(sortFile);
+  close(sockfd);
   pthread_exit(NULL);
-  return NULL;
+  return 0;
 }
