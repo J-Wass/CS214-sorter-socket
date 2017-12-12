@@ -12,6 +12,8 @@
 #include <netinet/in.h>
 #include "sorter-server.h"
 
+pthread_mutex_t sock_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void error(char *msg)
 {
     perror(msg);
@@ -21,7 +23,7 @@ pthread_t * threads;
 int threadCount;
 int main(int argc, char *argv[])
 {
-     int sockfd, newsockfd, portno, clilen;
+     int sockfd, portno, clilen;
      struct sockaddr_in serv_addr, cli_addr;
      if (argc < 2) {
          fprintf(stderr,"ERROR, no port provided\n");
@@ -44,17 +46,25 @@ int main(int argc, char *argv[])
      threadCount = -1;
      while(1){
        //spawn a new thread for each socket
-       newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-       printf("creating socket: %d\n", newsockfd);
+       int * sock_fd = malloc(sizeof(int));
+       int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+       *sock_fd = newsockfd;
+
        pthread_t thr;
-       pthread_create (&thr, NULL, FileHandler, (void *)&newsockfd);
+       //race condition where newsock is changed before it gets dereferenced by file handler
+       pthread_create (&thr, NULL, FileHandler, (void *)sock_fd);
        threads[++threadCount] = thr;
      }
      return 0;
 }
 
 void* FileHandler(void * socket){
+  //get the socket fd before the while loop updates it
+  pthread_mutex_lock(&sock_mutex);
   int newsock = *((int *)socket);
+  free(socket);
+  pthread_mutex_unlock(&sock_mutex);
+
   if (newsock < 0)
   {
     printf("connect error: %d\n", newsock);
@@ -66,37 +76,31 @@ void* FileHandler(void * socket){
   int OGsock = newsock;
   read(newsock,&pid,4); //get pid
   newsock = OGsock;
-  printf("%d - PID: %d\n",newsock,pid);
   read(newsock,&sortby,4); //get sort col
   newsock = OGsock;
-  printf("%d - sort int: %d\n",newsock,sortby);
   read(newsock,&fileSize,8); //get size of incoming file
   newsock = OGsock;
   char buffer[fileSize];
   bzero(buffer, fileSize);
-  printf("%d - file size: %d\n",newsock,fileSize);
   read(newsock, buffer,fileSize); //load file into buffer
   newsock = OGsock;
-  printf("%d - buffer: %s\n",newsock,buffer);
 
   //all finished signal, lets sort and build this
   if(pid == -1){
     //join all threads (besides this one)
     threadCount--;
     for(;threadCount >= 0; threadCount--){
-      printf("%d => %lu\n", threadCount, threads[threadCount]);
       pthread_join(threads[threadCount], NULL);
-      printf("joined\n");
     }
-    printf("all done, merge into list and send");
+    printf("all done, merge into list and send\n");
     //force the linked list to not be circular
     //send the length
     //send the entire list to the client
     //send -1 (all done)
   }
   else{
+    printf("%d - buffer:\n%s\n",newsock,buffer);
     //run buffer through the mergesort and attach it to the circular linked list
-    printf("%d - merging!\n", newsock);
   }
   close(newsock);
   pthread_exit(NULL);

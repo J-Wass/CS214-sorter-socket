@@ -140,10 +140,8 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
       strcat(path, name);
       strcat(path, "\0");
       pthread_t thr;
-      printf("sorting %s\n", name);
       pthread_create (&thr, NULL, FileSortHandler, (void *)path);
       threads[++threadCount] = thr;
-      printf("%d => %lu\n",threadCount, threads[threadCount]);
 
 
     }
@@ -160,9 +158,7 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
   }
   //wait for all threads to be sent out
   if(isMain){
-    printf("joining\n");
     for(;threadCount >= 0; threadCount--){
-      printf("%d => %lu\n", threadCount, threads[threadCount]);
       pthread_join(threads[threadCount], NULL);
     }
     int sockfd, portno;
@@ -235,7 +231,7 @@ void* FileSortHandler(void * filename){
   fseek(sortFile, 0, SEEK_SET);
   char * buffer = malloc(sizeof(char)*bufsize);
   fread(buffer, bufsize, sizeof(char),sortFile);
-  printf("(%d) sending %s\n", pid, buffer);
+  printf("(%d) sending:\n%s\n", pid, buffer);
   write(sockfd,&pid,sizeof(pid)); //pid
   write(sockfd,&sortingInt,sizeof(sortingInt)); //sort int
   write(sockfd, &bufsize, sizeof(long)); //size of file
