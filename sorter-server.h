@@ -1,5 +1,5 @@
-#ifndef SORTER_THREAD_H
-#define SORTER_THREAD_H
+#ifndef SORTER_SERVER_H
+#define SORTER_SERVER_H
 
 extern int * sortInt;
 extern int * threadCount;
