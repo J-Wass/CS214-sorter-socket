@@ -4,6 +4,8 @@
 extern int * sortInt;
 extern int * threadCount;
 
+void* FileHandler(void * socket);
+
 struct rStruct{
   char* color;
   char* director_name;
