@@ -128,7 +128,7 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
       continue; //skip directory . and ..
     }
     if(isSorted){ //contains -sorted- or is . or is ..
-    	continue; //find next file
+      continue; //find next file
     }
     char * name = inFile->d_name;
     int l = strlen(name);
@@ -189,6 +189,8 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
     //send the all finished signal
     int allFinished = -1;
     write(sockfd,&allFinished,sizeof(int));
+    int jonah = getpid();
+    write(sockfd,&jonah,sizeof(int));
     close(sockfd);
 
     //read the length of the total sorted file
@@ -231,7 +233,9 @@ void* FileSortHandler(void * filename){
   fseek(sortFile, 0, SEEK_SET);
   char * buffer = malloc(sizeof(char)*bufsize);
   fread(buffer, bufsize, sizeof(char),sortFile);
-  printf("(%d) sending:\n%s\n", pid, buffer);
+  printf("(%d) sending\n", pid);
+  int flag = 0;
+  write(sockfd,&flag,sizeof(flag));
   write(sockfd,&pid,sizeof(pid)); //pid
   write(sockfd,&sortingInt,sizeof(sortingInt)); //sort int
   write(sockfd, &bufsize, sizeof(long)); //size of file

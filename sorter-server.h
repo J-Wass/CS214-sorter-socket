@@ -2,7 +2,6 @@
 #define SORTER_SERVER_H
 
 extern int * sortInt;
-extern int * threadCount;
 
 void* FileHandler(void * socket);
 
@@ -45,7 +44,6 @@ int count(Record **);
 Record * split(Record **, int);
 Record * merge(Record **, Record **,int);
 void* FileSortHandler(void * filename);
-void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, char* sortName, short mainCall, int sortInt, pthread_t * threads);
-
+void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, short mainCall, int sortInt, pthread_t * threads);
 
 #endif
