@@ -20,7 +20,7 @@ int threadCount;
 
 int main(int argc, char ** argv){
   if(argc < 7){
-    fprintf(stderr, "Too few arguments. Usage is ./sorter -c [sortcol] -h [host] -p [port number]\n");
+    fprintf(stderr, "Too few arguments. Usage is ./client -c [sortcol] -h [host] -p [port number]\n");
     return 0;
   }
   char inDir[1024];
@@ -28,7 +28,7 @@ int main(int argc, char ** argv){
   char sortByCol[1024];
 
   if(strcmp("-c", argv[1]) != 0 || strcmp("-h", argv[3]) != 0 || strcmp("-p", argv[5]) != 0 ){
-    fprintf(stderr, "Wrong order of argument. Usage is ./sorter -c [sortcol] -h [host] -p [port number]\n");
+    fprintf(stderr, "Wrong order of arguments. Usage is ./client -c [sortcol] -h [host] -p [port number]\n");
     return 0;
   }
   //copy args to local variables
@@ -48,7 +48,7 @@ int main(int argc, char ** argv){
 
   if(argc >= 9){
     if(strcmp("-d",argv[7]) != 0){
-      fprintf(stderr, "Expecting -d flag. Usage is ./sorter -c [sortcol] -h [host] -p [port number] -d [in directory]\n");
+      fprintf(stderr, "Expecting -d flag. Usage is ./client -c [sortcol] -h [host] -p [port number] -d [in directory]\n");
       return 0;
     }
     strcpy(inDir, argv[8]);
@@ -56,7 +56,7 @@ int main(int argc, char ** argv){
 
   if(argc == 10){
     if(strcmp("-o",argv[9]) != 0){
-      fprintf(stderr, "Expecting -o flag. Usage is ./sorter -c [sortcol] -h [host] -p [port number] -d [in directory] -o [out directory]\n");
+      fprintf(stderr, "Expecting -o flag. Usage is ./client -c [sortcol] -h [host] -p [port number] -d [in directory] -o [out directory]\n");
       return 0;
     }
     strcpy(outDir, argv[10]);

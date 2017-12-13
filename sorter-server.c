@@ -340,7 +340,6 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, shor
   }
 }
 
-//SEGFAULT LOCATED HERE
 void* FileSortHandler(void * filename){
   //printf("%ld, ",(unsigned long int)pthread_self());
   //fflush(stdout);
@@ -504,6 +503,7 @@ void* FileSortHandler(void * filename){
     }
     //add final column
     char * token = (char *)malloc(sizeof(char) * (end-start+1));
+    memset(token, '\0', sizeof(char)* (end-start+1));
     int tempEnd = end;
     while(isspace(line[tempEnd])){
       tempEnd--;
