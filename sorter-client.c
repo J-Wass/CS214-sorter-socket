@@ -111,7 +111,7 @@ int main(int argc, char ** argv){
   //dont really need outputDir or outDir atm...
   pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
   threadCount = -1;
-  sortCSVs(inputDir, inDir, outputDir, outDir, threads, 1);
+  sortCSVs(inputDir, inDir, outputDir, outDir, threads, 1, sortByCol);
   //create another socket request for the all-sorted.csv and write it to outdir now
   closedir(inputDir);
   closedir(outputDir);
@@ -119,7 +119,7 @@ int main(int argc, char ** argv){
   return 0;
 }
 
-void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthread_t * threads, short isMain){
+void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthread_t * threads, short isMain, char* sorting){
   struct dirent* inFile;
   char * isSorted;
   while((inFile = readdir(inputDir)) != NULL){
@@ -143,7 +143,6 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
       pthread_create (&thr, NULL, FileSortHandler, (void *)path);
       threads[++threadCount] = thr;
 
-
     }
     //DIRECTORY
     if(inFile->d_type == 4){
@@ -152,7 +151,7 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
       strcat(newDir, "/");
       strcat(newDir, name);
       DIR * open = opendir(newDir);
-      sortCSVs(open, newDir, outputDir, outDir, threads, 0);
+      sortCSVs(open, newDir, outputDir, outDir, threads, 0, sorting);
       closedir(open);
     }
   }
@@ -190,11 +189,29 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
     int allFinished = -1;
     write(sockfd,&allFinished,sizeof(int));
     int pid = getpid();
-    write(sockfd,&ind,sizeof(int));
+    write(sockfd,&pid,sizeof(int));
+    write(sockfd,&sortInt,sizeof(int));
+
+    long buffSizeDoe;
+    read(sockfd, &buffSizeDoe, 8);
+    char buffer[buffSizeDoe+1];
+    read(sockfd, buffer, buffSizeDoe);
+    buffer[buffSizeDoe] = '\0';
+
+    char *filepath2 = (char*)malloc(sizeof(char)*500);
+    strcpy(filepath2,outDir);
+    strcat(filepath2, "/AllFiles-sorted-");
+    strcat(filepath2, sorting);
+    strcat(filepath2, ".csv");
+
+    FILE* fileDoe = fopen(filepath2, "w");
+    fwrite(buffer, sizeof(char), buffSizeDoe, fileDoe);
+    fflush(fileDoe);
+
+    fclose(fileDoe);
+
     close(sockfd);
 
-    //read the length of the total sorted file
-    //now read the total sorted file
   }
   return;
 }
@@ -237,6 +254,7 @@ void* FileSortHandler(void * filename){
   int flag = 0;
   write(sockfd,&flag,sizeof(flag));
   write(sockfd,&pid,sizeof(pid)); //pid
+  printf("sortint: %d\n", sortingInt);
   write(sockfd,&sortingInt,sizeof(sortingInt)); //sort int
   write(sockfd, &bufsize, sizeof(long)); //size of file
   write(sockfd, buffer, bufsize); //file

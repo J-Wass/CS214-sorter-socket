@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include "sorter-server.h"
 #include "mergesort.c"
+#define col_count 28
 
 pthread_mutex_t sock_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -23,8 +24,6 @@ void error(char *msg)
 }
 pthread_t * threads;
 int threadCount;
-pthread_t * threads_;
-int threadCount2;
 
 int main(int argc, char *argv[])
 {
@@ -75,17 +74,18 @@ void* FileHandler(void * socket){
     printf("connect error: %d\n", newsock);
     error("ERROR on accept");
   }
-  int pid = 0;
-  int sortby = 0;
+  int dick = 0;
+  int* pid = malloc(sizeof(int));
   int fileSize = 0;
   int flag = 0;
   int OGsock = newsock;
 
   read(newsock,&flag,4); //get flag
   newsock = OGsock;
-  read(newsock,&pid,4); //get pid
+  read(newsock,pid,4); //get pid
   newsock = OGsock;
-  read(newsock,&sortby,4); //get sort col
+  //printf("PID: %d\n", *pid);
+  read(newsock,&sort_on,4); //get sort col 
   newsock = OGsock;
   read(newsock,&fileSize,8); //get size of incoming file
   newsock = OGsock;
@@ -93,6 +93,8 @@ void* FileHandler(void * socket){
   bzero(buffer, fileSize);
   read(newsock, buffer,fileSize); //load file into buffer
   newsock = OGsock;
+
+  //printf("sort_on: %d \n", sort_on);
 
   //all finished signal, lets sort and build this
   if(flag == -1){
@@ -102,31 +104,65 @@ void* FileHandler(void * socket){
       pthread_join(threads[threadCount], NULL);
     }
     //at this point, all threads are done and all files are written
-    printf("merging\n");
-    threadCount2 = -1;
+    //printf("merging\n");
     //force the linked list to not be circular
     //send the length
     //send the entire list to the client
     //send -1 (all done)
     char pstring2[32];
-    sprintf(pstring2, "%d", pid);
-    DIR* inpDir = opendir(pstring2);
-    DIR* outDir = opendir(pstring2);
-    threads_ = (pthread_t *)malloc(sizeof(pthread_t) * 1);
-    //sort everything
-    sortCSVs(inpDir, pstring2, outDir, pstring2, 1, sortby, threads_);
-    closedir(inpDir);
-    closedir(outDir);
+    sprintf(pstring2, "%d", *pid);
+
+    //initializes data array
+    num_rows=10000000, row_count=0;
+    data = (row_data*)malloc(num_rows*sizeof(row_data));
+    
+    //intializes threads array
+    num_threads=2100, thread_count = -1;
+    threads = (pthread_t*)malloc(num_threads*sizeof(pthread_t));
+
+    traverse_dir(pstring2);
+
+    int i=0;
+    for (i=0; i<=thread_count; i++) {
+      pthread_join(threads[i],NULL);
+    }
+    
+    //sorts the data array
+    //printf("sorting now\n");
+    sort_csv();
+
+    //prints the sorted data array
+    //printf("printing now\n");
+    print_csv(pid);
+
+    char *filepath = (char*)malloc(sizeof(char)*500);
+    char myburpman[16];
+    sprintf(myburpman, "%d", *pid);
+
+    strcpy(filepath, myburpman);
+    strcat(filepath, "/Allfiles.csv");
+    FILE* Allfiles = fopen(filepath, "r");
+    fseek(Allfiles, 0, SEEK_END);
+    
+    long buffSize = ftell(Allfiles);
+    fseek(Allfiles, 0, SEEK_SET);
+    char * buffer = malloc(sizeof(char)*buffSize);
+    fread(buffer, buffSize, sizeof(char),Allfiles);
+    write(newsock, &buffSize, sizeof(long));
+    write(newsock, buffer, buffSize);
+    fclose(Allfiles);
+
+    free(pid);
+    free(data);
+    free(threads);
   }
   else{
     //write each received file to hard drive
     buffer[fileSize] = '\0';
-    sortingInt = sortby;
     char pstring[32];
 
     char saak[16];
-
-    sprintf(pstring, "%d", pid);
+    sprintf(pstring, "%d", *pid);
     sprintf(saak, "%d", OGsock);
 
     struct stat st = {0};
@@ -154,382 +190,399 @@ void* FileHandler(void * socket){
   return 0;
 }
 
-void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, short mainCall, int sortInt, pthread_t * threads_){
-  struct dirent* inFile;
-  char * isSorted;
-  while((inFile = readdir(inputDir)) != NULL){
-    isSorted = strstr(inFile->d_name, "-sorted-");
-    if((strcmp(inFile->d_name, ".") == 0 || strcmp(inFile->d_name, "..") == 0) && inFile->d_type == 4){
-      continue; //skip directory . and ..
+/*---------------------------------------------------------------*/
+
+void traverse_dir(char *search_dir){
+  DIR *dp = NULL;
+  struct dirent *current = NULL;
+  
+  //checks if search directory exists
+  if ((dp=opendir(search_dir))==NULL) {
+    printf("error - search directory, '%s', does not exist\n", search_dir);
+    exit(0);
+  }
+  
+  //printf("SEARCHING DIRECTORY: $%s$\n", search_dir);
+  
+  //traverses through entire search directory
+  while (current = readdir(dp)) {
+    //printf("test: %s\n", current->d_name);
+    if (!strcmp(".", current->d_name) || !strcmp("..", current->d_name)) continue;
+    if (current->d_type==DT_REG && isCSV(current->d_name)==1) {
+      char *new_file_dir = (char*)malloc(strlen(current->d_name)+strlen(search_dir)+3);
+      new_file_dir[0] = '\0';
+      strcpy(new_file_dir, search_dir);
+      strcat(new_file_dir, "/");
+      strcat(new_file_dir, current->d_name);
+      //printf("file: %s\n", new_file_dir);
+      //fflush(stdout);
+      
+      pthread_mutex_lock(&store_threads);
+      
+      /*if (thread_count==(num_threads-1)) {
+        num_threads+=2;
+        threads=(pthread_t*)realloc(threads,num_threads*sizeof(pthread_t));
+        printf("REALLOCING THREADS %d\n", num_threads);
+       }*/
+      thread_count+=1;
+      //pthread_create(&threads[thread_count], NULL, parse_csv, (void *)new_file_dir);
+      if (thread_count<1021) {
+        pthread_create(&threads[thread_count], NULL, parse_csv, (void *)new_file_dir);
+      }
+      else {
+        fprintf(stdout, "\n--------------\nOur Program does not run well when it has to deal with >1022 threads. Exiting Now.\n--------------\n");
+        exit(0);
+      }
+      pthread_mutex_unlock(&store_threads);
+      /*if(pthread_create(&threads[thread_count], NULL, parse_csv, (void *)new_file_dir)!=0) {
+        thread_count-=1;
+        printthreadarray();
+       }*/
+      //parse_csv(new_file_dir);
+      //free(new_file_dir);
     }
-    if(isSorted){ //contains -sorted- or is . or is ..
-      continue; //find next file
-    }
-    char * name = inFile->d_name;
-    int l = strlen(name);
-    //REGULAR FILE
-    if(inFile->d_type == 8 && name[l-4] == '.' && name[l-3] == 'c' && name[l-2] == 's' && name[l-1] == 'v'){
-      char * path = (char *)malloc(sizeof(char)*(strlen(inDir) + 2 + strlen(name)));
-      strcpy(path, inDir);
-      strcat(path, "/");
-      strcat(path, name);
-      strcat(path, "\0");
-      pthread_t thr;
-      pthread_create (&thr, NULL, FileSortHandler, (void *)path);
-      ++(threadCount2);
-      threads_[threadCount2] = thr;
-    }
-    //DIRECTORY
-    if(inFile->d_type == 4){
-      char newDir[1 + strlen(inDir) + strlen(name)];
-      strcpy(newDir, inDir);
-      strcat(newDir, "/");
-      strcat(newDir, name);
-      DIR * open = opendir(newDir);
-      sortCSVs(open, newDir, outputDir, outDir, 0, sortInt, threads_);
-      closedir(open);
+    else if(current->d_type==DT_DIR) {
+      char *new_search_dir = (char*)malloc(strlen(current->d_name)+strlen(search_dir)+3);
+      new_search_dir[0] = '\0';
+      strcpy(new_search_dir, search_dir);
+      strcat(new_search_dir, "/");
+      strcat(new_search_dir, current->d_name);
+      //fflush(stdout);
+      //printf("DIR: %s\n", new_search_dir);
+      
+      pthread_mutex_lock(&store_threads);
+      /*if (thread_count==(num_threads-1)) {
+        num_threads*=2;
+        threads=(pthread_t*)realloc(threads,num_threads*sizeof(pthread_t));
+        printf("REALLOCING THREADS %d\n", num_threads);
+       }*/
+      thread_count+=1;
+      
+      //pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir);
+      if(thread_count<1021) {
+        pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir);
+      }
+      else {
+        fprintf(stdout, "Our Program does not run well when it has to deal with more than 1022 threads. Exiting Now.\n");
+        exit(0);
+      }
+      pthread_mutex_unlock(&store_threads);
+      
+      /*if(pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir)!=0) {
+        thread_count-=1;
+        printthreadarray();
+       }*/
+      //traverse_dir(new_search_dir);
+      //free(new_search_dir);
     }
   }
-  //only run if called from main()
-  if(mainCall == 1){
-    int counter = threadCount2;
-    Record * linkedlist = NULL;
-    while(counter >= 0){
-      Record * head;
-      pthread_join(threads_[counter--], (void *)&head);
-      if(linkedlist == NULL){
-        linkedlist = head;
-      }
-      else{
-        //combine new linked list with main circular linked list
-        Record * temp = linkedlist->next;
-        linkedlist->next = head->next;
-        head->next = temp;
-      }
-    }
-    //break linked list and attempt to sort
-    Record * tempH = linkedlist;
-    linkedlist = linkedlist->next;
-    tempH->next = NULL;
-    Record * sortedHead;
-    Record ** sorted_head;
-    sorted_head = mergesort(&linkedlist);
-    sortedHead= *sorted_head;
-    //sortedHead = linkedlist;
-
-    //write total file to hard drive
-    char newFile[21 + strlen(outDir)];
-    strcpy(newFile, outDir);
-    strcat(newFile, "/AllFiles.csv");
-    FILE * writeFile = fopen(newFile, "w");
-    fprintf(writeFile,"color,director_name,num_critic_for_reviews,duration,director_facebook_likes,"
-    "actor_3_facebook_likes,actor_2_name,actor_1_facebook_likes,gross,genres,actor_1_name,"
-    "movie_title,num_voted_users,cast_total_facebook_likes,actor_3_name,facenumber_in_poster,"
-    "plot_keywords,movie_imdb_link,num_user_for_reviews,language,country,content_rating,"
-    "budget,title_year,actor_2_facebook_likes,imdb_score,aspect_ratio,movie_facebook_likes\n");
-    while(sortedHead != NULL){
-      Record * r = sortedHead;
-      char numCritic[50] = "";
-      char duration[50] = "";
-      char directLikes[50] = "";
-      char actor3Likes[50] = "";
-      char actor1Likes[50] = "";
-      char gross[50] = "";
-      char numVoted[50] = "";
-      char castLikes[50] = "";
-      char faceNumber[50] = "";
-      char numReviews[50] = "";
-      char budget[50] = "";
-      char actor2Likes[50] = "";
-      char titleYear[50] = "";
-      char imdbScore[50] = "";
-      char aspectRatio[50] = "";
-      char movieLikes[50] = "";
-
-      if(r->num_critic_for_reviews != -1){
-          snprintf(numCritic, 5000, "%d",r->num_critic_for_reviews);
-      }
-      if(r->duration != -1){
-          snprintf(duration, 5000, "%d",r->duration);
-      }
-      if(r->director_facebook_likes != -1){
-          snprintf(directLikes, 5000, "%d",r->director_facebook_likes);
-      }
-      if(r->actor_3_facebook_likes != -1){
-          snprintf(actor3Likes, 5000, "%d",r->actor_3_facebook_likes);
-      }
-      if(r->actor_1_facebook_likes != -1){
-          snprintf(actor1Likes, 5000, "%d",r->actor_1_facebook_likes);
-      }
-      if(r->gross != -1){
-          snprintf(gross, 5000, "%d",r->gross);
-      }
-      if(r->num_voted_users != -1){
-          snprintf(numVoted, 5000, "%d",r->num_voted_users);
-      }
-      if(r->cast_total_facebook_likes != -1){
-          snprintf(castLikes, 5000, "%d",r->cast_total_facebook_likes);
-      }
-      if(r->facenumber_in_poster != -1){
-          snprintf(faceNumber, 5000, "%d",r->facenumber_in_poster);
-      }
-      if(r->num_critic_for_reviews != -1){
-          snprintf(numReviews, 5000, "%d",r->num_critic_for_reviews);
-      }
-      if(r->budget != -1){
-          snprintf(budget, 5000, "%li",r->budget);
-      }
-      if(r->actor_2_facebook_likes != -1){
-          snprintf(actor2Likes, 5000, "%d",r->actor_2_facebook_likes);
-      }
-      if(r->title_year != -1){
-          snprintf(titleYear, 5000, "%d",r->title_year);
-      }
-      if(r->imdb_score != -1){
-          snprintf(imdbScore, 5000, "%f",r->imdb_score);
-      }
-      if(r->aspect_ratio != -1){
-          snprintf(aspectRatio, 5000, "%f",r->aspect_ratio);
-      }
-      if(r->movie_facebook_likes != -1){
-          snprintf(movieLikes, 5000, "%d",r->movie_facebook_likes);
-      }
-
-      if(strchr(r->movie_title, ',') == NULL){ //no commas in this movie title
-        fprintf(writeFile,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
-              r->color, r->director_name, numCritic, duration,
-              directLikes, actor3Likes, r->actor_2_name,
-              actor1Likes, gross, r->genres, r->actor_1_name,
-              r->movie_title, numVoted, castLikes,
-              r->actor_3_name, faceNumber, r->plot_keywords, r->movie_imdb_link,
-              numReviews,r->language, r->country, r->content_rating,
-              budget, titleYear, actor2Likes, imdbScore,
-              aspectRatio, movieLikes);
-      }
-      else{ //put quotes around the movie title
-        fprintf(writeFile,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,\"%s\",%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
-                r->color, r->director_name, numCritic, duration,
-                directLikes, actor3Likes, r->actor_2_name,
-                actor1Likes, gross, r->genres, r->actor_1_name,
-                r->movie_title, numVoted, castLikes,
-                r->actor_3_name, faceNumber, r->plot_keywords, r->movie_imdb_link,
-                numReviews,r->language, r->country, r->content_rating,
-                budget, titleYear, actor2Likes, imdbScore,
-                aspectRatio, movieLikes);
-      }
-      Record * temp = sortedHead;
-      sortedHead = sortedHead->next;
-      free(temp->content_rating);
-      free(temp->country);
-      free(temp->language);
-      free(temp->movie_imdb_link);
-      free(temp->plot_keywords);
-      free(temp->actor_3_name);
-      free(temp->movie_title);
-      free(temp->actor_1_name);
-      free(temp->genres);
-      free(temp->actor_2_name);
-      free(temp->director_name);
-      free(temp->color);
-      free(temp);
-    }
-    //send AllFiles.csv to client
-
-
-    fclose(writeFile);
-  }
+  closedir(dp);
+  return;
 }
 
-//returns filename as a linked list of records
-void* FileSortHandler(void * filename){
-  FILE * sortFile = fopen((char *)filename, "r");
-  char * line = NULL;
-  size_t nbytes = 0 * sizeof(char);
-  Record * prevRec = NULL;
-  Record * head = NULL;
-  Record * last;
-  getline(&line, &nbytes, sortFile); //skip over first row (just the table headers)
-  //eat sortFile line by line
-  while (getline(&line, &nbytes, sortFile) != -1) {
-    printf("%d - %s\n", (int)pthread_self(), line);
-    head = (Record *)malloc(sizeof(Record));
-    int start = 0;
-    int end = 0;
-    char lookAhead = line[end];
-    int colId = 0;
-    short inString = 0;
-    while((lookAhead = line[end]) != '\n'){
-      if(lookAhead == '"'){
-        inString = inString == 0 ? 1 : 0; //keep track if we are inside of quotes
-      }
-      else{ //normal char
-        if(lookAhead == ',' && inString == 0){ //token found!
-          char * token = (char *)malloc(sizeof(char));
-          token[0] = '\0';
-          if(end != start){ //if end == start, this is an empty entry
-            int tempEnd = end - 1;
-            if(line[start] == '"' && line[end-1] == '"'){ //trim quotes
-              tempEnd--;
-              start++;
-            }
-            tempEnd++;//move past last valid character
-            //trim whitespace
-            while(isspace(line[tempEnd-1])){
-              tempEnd--;
-            }
-            while(isspace(line[start])){
-              start++;
-            }
-            if(line[tempEnd - 1] == ' '){
-              line[tempEnd - 1] = '\0';
-            }
-            else{
-              line[tempEnd] = '\0';
-            }
-            token = (char *)realloc(token, sizeof(char) * (tempEnd-start+1));
-            memcpy(token, line + start, tempEnd - start+1);
-          }
-          switch(colId){
-            case 0:
-              head->color = token;
-              break;
-            case 1:
-              head->director_name = token;
-              break;
-            case 2:
-              head->num_critic_for_reviews = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 3:
-              head->duration = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 4:
-              head->director_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 5:
-              head->actor_3_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 6:
-              head->actor_2_name = token;
-              break;
-            case 7:
-              head->actor_1_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 8:
-              head->gross = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 9:
-              head->genres = token;
-              break;
-            case 10:
-              head->actor_1_name = token;
-              break;
-            case 11:
-              head->movie_title = token;
-              break;
-            case 12:
-              head->num_voted_users = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 13:
-              head->cast_total_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 14:
-              head->actor_3_name = token;
-              break;
-            case 15:
-              head->facenumber_in_poster = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 16:
-              head->plot_keywords = token;
-              break;
-            case 17:
-              head->movie_imdb_link = token;
-              break;
-            case 18:
-              head->num_user_for_reviews = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 19:
-              head->language = token;
-              break;
-            case 20:
-              head->country = token;
-              break;
-            case 21:
-              head->content_rating = token;
-              break;
-            case 22:
-              head->budget = token[0] == '\0' ? -1 :atol(token);
-              free(token);
-              break;
-            case 23:
-              head->title_year = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 24:
-              head->actor_2_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            case 25:
-              head->imdb_score = token[0] == '\0' ? -1 : atof(token);
-              free(token);
-              break;
-            case 26:
-              head->aspect_ratio = token[0] == '\0' ? -1 : atof(token);
-              free(token);
-              break;
-            case 27:
-              //this case never happens lol
-              head->movie_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-              free(token);
-              break;
-            default:
-              break;
-          }
-          colId++;
-          start = ++end;
-          continue;
+/*---------------------------------------------------------------*/
+
+void* thread_traverse_dir(void* thread_search) {
+  //printf("entering traverse thread\n");
+  char* search_dir = (char*)thread_search;
+  //printf("SEARCHING dir: $%s$\n",search_dir);
+  traverse_dir(search_dir);
+  //printf("freeing traverse thread\n");
+  free(search_dir);
+  //printf("exiting traverse thread\n");
+  pthread_exit(NULL);
+}
+
+/*---------------------------------------------------------------*/
+
+void* parse_csv(void* filepath_temp) {
+  char* filepath = (char*)filepath_temp;
+  
+  //printf("PARSING FILE: $%s$\n", filepath);
+  
+  //opens the .csv file to be read
+  FILE *fp = fopen(filepath, "r");
+  
+  free(filepath);
+  
+  char temp[1000];
+  
+  //checks if the header is properly formatted
+  char header[1000];
+  char header_print[1000];
+  fgets(header,1000,fp);
+  strcpy(header_print, header);
+  char *header_ptr=header;
+  int i_header = 0;
+  char *header_token;
+  while(header_token = strsep(&header_ptr, ",")) {
+    if (i_header==27) header_token[strlen(header_token)-2]='\0';
+    if (i_header==col_count || strcmp(headers[i_header],header_token)) {
+      fclose(fp);
+      pthread_exit(NULL);
+      return;
+    }
+    i_header++;
+  }
+  
+  //int row_count=0;
+  pthread_mutex_lock(&store_data);
+  while(fgets(temp,1000,fp)) {
+    char *line = temp;
+    char *token;
+    int i=0;
+    //printf("before lock\n");
+    
+    if (row_count==(num_rows-1)) {
+      num_rows=num_rows*2;
+      data=(row_data*)realloc(data,num_rows*sizeof(row_data));
+      //printf("REALLOCING DATA %d\n", num_rows);
+    }
+    //printf("after lock\n");
+    while (i<col_count) {
+      //extracts a token
+      token=strsep(&line, ",");
+      char *trimmed = (char*)malloc(sizeof(char)*500);
+      trimmed[0]='\0';
+      
+      //checks if there are quotes around movie_title column signifying commas
+      //trims whitespace for movie_titles that have quotes/commas
+      if (i==11 && isQuote(token)) {
+        data[row_count].quote=1;
+        char *forward = (char*)malloc(sizeof(char)*500);
+        forward[0]='\0';
+        strcat(forward, token);
+        strcat(forward,",");
+        do {
+          token=strsep(&line, ",");
+          strcat(forward, token);
+          if (!isQuote(token)) strcat(forward, ",");
+        } while (!isQuote(token));
+        char *temp = (char*)malloc(sizeof(char*)*500);
+        temp[0]='\0';
+        int q;
+        for(q=1;q<strlen(forward)-1;q++) {
+          temp[q-1]=forward[q];
         }
+        token=temp;
+        free(temp);
+        free(forward);
       }
-      end++;
+      
+      //trims whitepsace for all inputs
+      int start = 0;
+      int end = strlen(token)-1;
+      while(token[start]==' ') {
+        if (start==end) trimmed[0]=' ';
+        start++;
+      }
+      while(token[end]==' ') {
+        if (start==end) trimmed[0]=' ';
+        end--;
+      }
+      int j;
+      for(j=start; j<=end; j++) {
+        if (token[j+1]=='\n') continue;
+        trimmed[j-start]=token[j];
+      }
+      
+      //for strings, if a data point is empty, it saves it as an empty string
+      //for integers/doubles, if a data point is empty, it saves it as -99999, temporarily
+      if (!strcmp(trimmed,"") || !strcmp(trimmed," ")) {
+        if (i==0 || i==1 || i==6 || i==9 || i==10 || i==11 || i==14 || i==16 || i==17 || i==19 || i==20 || i==21)
+          trimmed="";
+        else
+          trimmed="-99999";
+      }
+      //printf("before: %d %d %d\n", num_rows, row_count, i);
+      //assigns token to respective struct variable
+      switch(i) {
+        case 0:
+          strcpy(data[row_count].color,trimmed);
+        case 1:
+          strcpy(data[row_count].director_name,trimmed);
+        case 2:
+          data[row_count].num_critic_for_reviews = atoi(trimmed);
+        case 3:
+          data[row_count].duration = atoi(trimmed);
+        case 4:
+          data[row_count].director_facebook_likes = atoi(trimmed);
+        case 5:
+          data[row_count].actor_3_facebook_likes = atoi(trimmed);
+        case 6:
+          strcpy(data[row_count].actor_2_name,trimmed);
+        case 7:
+          data[row_count].actor_1_facebook_likes = atoi(trimmed);
+        case 8:
+          data[row_count].gross = atoi(trimmed);
+        case 9:
+          strcpy(data[row_count].genres,trimmed);
+        case 10:
+          strcpy(data[row_count].actor_1_name,trimmed);
+        case 11:
+          strcpy(data[row_count].movie_title,trimmed);
+        case 12:
+          data[row_count].num_voted_users = atoi(trimmed);
+        case 13:
+          data[row_count].cast_total_facebook_likes = atoi(trimmed);
+        case 14:
+          strcpy(data[row_count].actor_3_name,trimmed);
+        case 15:
+          data[row_count].facenumber_in_poster = atoi(trimmed);
+        case 16:
+          strcpy(data[row_count].plot_keywords,trimmed);
+        case 17:
+          strcpy(data[row_count].movie_imdb_link,trimmed);
+        case 18:
+          data[row_count].num_user_for_reviews = atoi(trimmed);
+        case 19:
+          strcpy(data[row_count].language,trimmed);
+        case 20:
+          strcpy(data[row_count].country,trimmed);
+        case 21:
+          strcpy(data[row_count].content_rating,trimmed);
+        case 22:
+          data[row_count].budget = atoi(trimmed);
+        case 23:
+          data[row_count].title_year = atoi(trimmed);
+        case 24:
+          data[row_count].actor_2_facebook_likes = atoi(trimmed);
+        case 25:
+          sscanf(trimmed, "%lf", &data[row_count].imdb_score);
+        case 26:
+          sscanf(trimmed, "%lf", &data[row_count].aspect_ratio);
+        case 27:
+          data[row_count].movie_facebook_likes = atoi(trimmed);
+      }
+      i++;
+      trimmed='\0';
+      free(trimmed);
     }
-    //add final column
-    char * token = (char *)malloc(sizeof(char) * (end-start+1));
-    memset(token, '\0', sizeof(char)* (end-start+1));
-    int tempEnd = end;
-    while(isspace(line[tempEnd])){
-      tempEnd--;
-    }
-    while(isspace(line[start])){
-      start++;
-    }
-    memcpy(token, line + start, tempEnd - start + 1);
-    head->movie_facebook_likes = token[0] == '\0' ? -1 : atoi(token);
-    free(token);
-
-    //create a new struct
-    if(prevRec == NULL){
-      last = head;
-    }
-    head->next = prevRec;
-    prevRec = head;
+    row_count++;
   }
-  last->next = head; //complete circular linked list
-  Record * temp = head->next;
-  printf("head: %d\n", head->gross);
-  while(temp != head){
-    printf("%d\n", temp->gross);
-    temp = temp->next;
-  }
-  fclose(sortFile);
-  pthread_exit(head);
-  return NULL;
+  pthread_mutex_unlock(&store_data);
+  fclose(fp);
+  pthread_exit(NULL);
 }
+
+/*---------------------------------------------------------------*/
+
+void sort_csv() {
+  //sorts the csv based on sort_on variable using mergesort
+  //handles the exception case where an empty csv is inputted with only a header row
+  //printf("sortintcol: %d\n",sort_on);
+  if(row_count!=0)
+    mergeSort(data, 0, row_count-1, sort_on);
+}
+
+/*---------------------------------------------------------------*/
+
+void print_csv(int* pid) {
+  char *new_file_path = (char*)malloc(sizeof(char)*500);
+  
+  // if (o) {
+  //   strcpy(new_file_path, output_dir);
+  //   strcat(new_file_path, "/Allfiles-sorted-");
+  // }
+  // else strcpy(new_file_path, "Allfiles-sorted-");
+  
+  //create new sorted file path
+  char myguy[16];
+  sprintf(myguy, "%d", *pid);
+  strcpy(new_file_path, myguy);
+  strcat(new_file_path, "/Allfiles.csv");  
+  //printf("%s\n", new_file_path);
+  
+  //create file stream
+  FILE *fp = fopen(new_file_path, "w");
+  
+  free(new_file_path);
+  
+  //prints the sorted csv data to respective file
+  //fprintf(fp, "%s",file->header);
+  //printf("hello1\n");
+  fprintf(fp,"color,director_name,num_critic_for_reviews,duration,director_facebook_likes,"
+  "actor_3_facebook_likes,actor_2_name,actor_1_facebook_likes,gross,genres,actor_1_name,"
+  "movie_title,num_voted_users,cast_total_facebook_likes,actor_3_name,facenumber_in_poster,"
+  "plot_keywords,movie_imdb_link,num_user_for_reviews,language,country,content_rating,"
+  "budget,title_year,actor_2_facebook_likes,imdb_score,aspect_ratio,movie_facebook_likes\n");
+
+  int z;
+  for(z=0; z<=(row_count-1); z++) {
+    //printf("printing row # %d\n", z);
+    fprintf(fp, "%s,",data[z].color);
+    
+    fprintf(fp, "%s,",data[z].director_name);
+    
+    if (data[z].num_critic_for_reviews==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].num_critic_for_reviews);
+    
+    if (data[z].duration==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].duration);
+    
+    if (data[z].director_facebook_likes==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].director_facebook_likes);
+    
+    if (data[z].actor_3_facebook_likes==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].actor_3_facebook_likes);
+    
+    fprintf(fp, "%s,",data[z].actor_2_name);
+    
+    if (data[z].actor_1_facebook_likes==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].actor_1_facebook_likes);
+    
+    if (data[z].gross==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].gross);
+    
+    fprintf(fp, "%s,",data[z].genres);
+    
+    fprintf(fp, "%s,",data[z].actor_1_name);
+    
+    if (data[z].quote) fprintf(fp,"\"%s\",", data[z].movie_title);
+    else fprintf(fp, "%s,",data[z].movie_title);
+    
+    if (data[z].num_voted_users==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].num_voted_users);
+    
+    if (data[z].cast_total_facebook_likes==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].cast_total_facebook_likes);
+    
+    fprintf(fp, "%s,",data[z].actor_3_name);
+    
+    if (data[z].facenumber_in_poster==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].facenumber_in_poster);
+    
+    fprintf(fp, "%s,",data[z].plot_keywords);
+    
+    fprintf(fp, "%s,",data[z].movie_imdb_link);
+    
+    if (data[z].num_user_for_reviews==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].num_user_for_reviews);
+    
+    fprintf(fp, "%s,",data[z].language);
+    
+    fprintf(fp, "%s,",data[z].country);
+    
+    fprintf(fp, "%s,",data[z].content_rating);
+    
+    if (data[z].budget==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].budget);
+    
+    if (data[z].title_year==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].title_year);
+    
+    if (data[z].actor_2_facebook_likes==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%d,",data[z].actor_2_facebook_likes);
+    
+    if (data[z].imdb_score==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%lf,",data[z].imdb_score);
+    
+    if (data[z].aspect_ratio==-99999) fprintf(fp, ",");
+    else fprintf(fp, "%lf,",data[z].aspect_ratio);
+    
+    fprintf(fp, "%d\n",data[z].movie_facebook_likes);
+  }
+  fclose(fp);
+}
+
+/*---------------------------------------------------------------*/
