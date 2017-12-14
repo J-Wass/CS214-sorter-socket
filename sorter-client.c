@@ -189,8 +189,8 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
     //send the all finished signal
     int allFinished = -1;
     write(sockfd,&allFinished,sizeof(int));
-    int jonah = getpid();
-    write(sockfd,&jonah,sizeof(int));
+    int pid = getpid();
+    write(sockfd,&ind,sizeof(int));
     close(sockfd);
 
     //read the length of the total sorted file

@@ -1,4 +1,4 @@
-int * sortingInt;
+int sortingInt;
 int
 count(Record ** head)
 {//count how many things are in the list
@@ -37,7 +37,7 @@ split(Record ** head, int count)
 
 }
 
-Record * 
+Record *
 merge(Record ** head, Record** secondHead, int sortBycol)
 {
   if(!(*head)){
@@ -45,7 +45,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
         }
     if(!(*secondHead)){
         return *head;
-      }    
+      }
     Record *returnHead;//begining of list
     Record *returnTop;//pointer to last non null node in list
     Record *HEAD = *head;
@@ -59,7 +59,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -120,7 +120,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -181,7 +181,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -242,7 +242,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -303,7 +303,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -364,7 +364,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -425,7 +425,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -486,7 +486,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -547,7 +547,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -608,7 +608,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -669,7 +669,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -730,7 +730,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -791,7 +791,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -852,7 +852,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -913,7 +913,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -974,7 +974,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1035,7 +1035,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1096,7 +1096,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1157,7 +1157,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1218,7 +1218,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1279,7 +1279,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1340,7 +1340,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1401,7 +1401,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1462,7 +1462,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1523,7 +1523,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1584,7 +1584,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1645,7 +1645,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1706,7 +1706,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
               ++count;
               returnTop = HEAD;
               returnHead = HEAD;
-            
+
             if(HEAD->next){
               HEAD = HEAD->next;
               returnTop->next = NULL;
@@ -1761,7 +1761,7 @@ merge(Record ** head, Record** secondHead, int sortBycol)
         }
       }
     }
-    return returnHead; 
+    return returnHead;
 }
 
 
@@ -1777,7 +1777,8 @@ Record **
 mergesort(Record** head)
  {//mergesort on head done by which column. COlumn is currently a string but we may swithc it to a int.
 	 int size = count(head);
-	 int sortByCol = *sortingInt;
+	 int sortByCol = sortingInt;
+	 printf("%d\n", sortByCol);
      /*if(size>4000){
       Record *secondHead; Record *firstHead;
       Record  **secondHEAD; Record **firstHEAD;

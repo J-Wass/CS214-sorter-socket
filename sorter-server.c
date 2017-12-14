@@ -101,7 +101,8 @@ void* FileHandler(void * socket){
     for(;threadCount >= 0; threadCount--){
       pthread_join(threads[threadCount], NULL);
     }
-    printf("all done, merge into list and send\n");
+    //at this point, all threads are done and all files are written
+    printf("merging\n");
     threadCount2 = -1;
     //force the linked list to not be circular
     //send the length
@@ -110,27 +111,23 @@ void* FileHandler(void * socket){
     char pstring2[32];
     sprintf(pstring2, "%d", pid);
     DIR* inpDir = opendir(pstring2);
-    if (inpDir == NULL) {
-      printf("PID: %d\n", pid);
-      fprintf(stderr,"Malformed input directory %s. Please make sure the directory spelling is correct before trying again.\n",
-       inpDir);
-      return 0;
-    }
     DIR* outDir = opendir(pstring2);
     threads_ = (pthread_t *)malloc(sizeof(pthread_t) * 1);
+    //sort everything
     sortCSVs(inpDir, pstring2, outDir, pstring2, 1, sortby, threads_);
+    closedir(inpDir);
+    closedir(outDir);
   }
   else{
+    //write each received file to hard drive
     buffer[fileSize] = '\0';
-
+    sortingInt = sortby;
     char pstring[32];
 
     char saak[16];
 
     sprintf(pstring, "%d", pid);
     sprintf(saak, "%d", OGsock);
-
-    DIR* dir = opendir(pstring);
 
     struct stat st = {0};
     if(stat(pstring, &st) == -1){
@@ -204,12 +201,13 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, shor
         linkedlist = head;
       }
       else{
-        //combining linked lists (doesn't fully work yet)
+        //combine new linked list with main circular linked list
         Record * temp = linkedlist->next;
         linkedlist->next = head->next;
         head->next = temp;
       }
     }
+    //break linked list and attempt to sort
     Record * tempH = linkedlist;
     linkedlist = linkedlist->next;
     tempH->next = NULL;
@@ -217,7 +215,9 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, shor
     Record ** sorted_head;
     sorted_head = mergesort(&linkedlist);
     sortedHead= *sorted_head;
+    //sortedHead = linkedlist;
 
+    //write total file to hard drive
     char newFile[21 + strlen(outDir)];
     strcpy(newFile, outDir);
     strcat(newFile, "/AllFiles.csv");
@@ -340,9 +340,8 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, shor
   }
 }
 
+//returns filename as a linked list of records
 void* FileSortHandler(void * filename){
-  //printf("%ld, ",(unsigned long int)pthread_self());
-  //fflush(stdout);
   FILE * sortFile = fopen((char *)filename, "r");
   char * line = NULL;
   size_t nbytes = 0 * sizeof(char);
@@ -352,6 +351,7 @@ void* FileSortHandler(void * filename){
   getline(&line, &nbytes, sortFile); //skip over first row (just the table headers)
   //eat sortFile line by line
   while (getline(&line, &nbytes, sortFile) != -1) {
+    printf("%d - %s\n", (int)pthread_self(), line);
     head = (Record *)malloc(sizeof(Record));
     int start = 0;
     int end = 0;
@@ -523,6 +523,12 @@ void* FileSortHandler(void * filename){
     prevRec = head;
   }
   last->next = head; //complete circular linked list
+  Record * temp = head->next;
+  printf("head: %d\n", head->gross);
+  while(temp != head){
+    printf("%d\n", temp->gross);
+    temp = temp->next;
+  }
   fclose(sortFile);
   pthread_exit(head);
   return NULL;
