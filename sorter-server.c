@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
      if (bind(sockfd, (struct sockaddr *) &serv_addr,
               sizeof(serv_addr)) < 0)
               error("ERROR on binding");
-     listen(sockfd,5);
+     listen(sockfd,1000);
      clilen = htonl(sizeof(cli_addr));
      threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
      threadCount = -1;
@@ -74,25 +74,21 @@ void* FileHandler(void * socket){
     printf("connect error: %d\n", newsock);
     error("ERROR on accept");
   }
-  int dick = 0;
   int* pid = malloc(sizeof(int));
   int fileSize = 0;
   int flag = 0;
   int OGsock = newsock;
 
+  puts("waiting for flag");
   read(newsock,&flag,4); //get flag
+  puts("got flag :)");
   newsock = OGsock;
   read(newsock,pid,4); //get pid
   newsock = OGsock;
   //printf("PID: %d\n", *pid);
-  read(newsock,&sort_on,4); //get sort col 
+  read(newsock,&sort_on,4); //get sort col
   newsock = OGsock;
-  read(newsock,&fileSize,8); //get size of incoming file
-  newsock = OGsock;
-  char buffer[fileSize+1];
-  bzero(buffer, fileSize);
-  read(newsock, buffer,fileSize); //load file into buffer
-  newsock = OGsock;
+
 
   //printf("sort_on: %d \n", sort_on);
 
@@ -115,7 +111,7 @@ void* FileHandler(void * socket){
     //initializes data array
     num_rows=10000000, row_count=0;
     data = (row_data*)malloc(num_rows*sizeof(row_data));
-    
+
     //intializes threads array
     num_threads=2100, thread_count = -1;
     threads = (pthread_t*)malloc(num_threads*sizeof(pthread_t));
@@ -126,7 +122,6 @@ void* FileHandler(void * socket){
     for (i=0; i<=thread_count; i++) {
       pthread_join(threads[i],NULL);
     }
-    
     //sorts the data array
     //printf("sorting now\n");
     sort_csv();
@@ -143,20 +138,33 @@ void* FileHandler(void * socket){
     strcat(filepath, "/Allfiles.csv");
     FILE* Allfiles = fopen(filepath, "r");
     fseek(Allfiles, 0, SEEK_END);
-    
+
     long buffSize = ftell(Allfiles);
     fseek(Allfiles, 0, SEEK_SET);
     char * buffer = malloc(sizeof(char)*buffSize);
+    puts("1");
     fread(buffer, buffSize, sizeof(char),Allfiles);
+    puts("2");
+
     write(newsock, &buffSize, sizeof(long));
+    puts("3");
+
     write(newsock, buffer, buffSize);
+    puts("4");
+
     fclose(Allfiles);
 
     free(pid);
     free(data);
-    free(threads);
   }
   else{
+    read(newsock,&fileSize,8); //get size of incoming file
+    newsock = OGsock;
+    char buffer[fileSize+1];
+    bzero(buffer, fileSize);
+    read(newsock, buffer,fileSize); //load file into buffer
+    newsock = OGsock;
+
     //write each received file to hard drive
     buffer[fileSize] = '\0';
     char pstring[32];
@@ -185,6 +193,7 @@ void* FileHandler(void * socket){
     //printf("%d - buffer:\n%s\n",newsock,buffer);
     //run buffer through the mergesort and attach it to the circular linked list
     }
+  threadCount = -1;
   close(newsock);
   pthread_exit(NULL);
   return 0;
@@ -195,15 +204,15 @@ void* FileHandler(void * socket){
 void traverse_dir(char *search_dir){
   DIR *dp = NULL;
   struct dirent *current = NULL;
-  
+
   //checks if search directory exists
   if ((dp=opendir(search_dir))==NULL) {
     printf("error - search directory, '%s', does not exist\n", search_dir);
     exit(0);
   }
-  
+
   //printf("SEARCHING DIRECTORY: $%s$\n", search_dir);
-  
+
   //traverses through entire search directory
   while (current = readdir(dp)) {
     //printf("test: %s\n", current->d_name);
@@ -216,9 +225,9 @@ void traverse_dir(char *search_dir){
       strcat(new_file_dir, current->d_name);
       //printf("file: %s\n", new_file_dir);
       //fflush(stdout);
-      
+
       pthread_mutex_lock(&store_threads);
-      
+
       /*if (thread_count==(num_threads-1)) {
         num_threads+=2;
         threads=(pthread_t*)realloc(threads,num_threads*sizeof(pthread_t));
@@ -249,7 +258,7 @@ void traverse_dir(char *search_dir){
       strcat(new_search_dir, current->d_name);
       //fflush(stdout);
       //printf("DIR: %s\n", new_search_dir);
-      
+
       pthread_mutex_lock(&store_threads);
       /*if (thread_count==(num_threads-1)) {
         num_threads*=2;
@@ -257,7 +266,7 @@ void traverse_dir(char *search_dir){
         printf("REALLOCING THREADS %d\n", num_threads);
        }*/
       thread_count+=1;
-      
+
       //pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir);
       if(thread_count<1021) {
         pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir);
@@ -267,7 +276,7 @@ void traverse_dir(char *search_dir){
         exit(0);
       }
       pthread_mutex_unlock(&store_threads);
-      
+
       /*if(pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir)!=0) {
         thread_count-=1;
         printthreadarray();
@@ -297,16 +306,16 @@ void* thread_traverse_dir(void* thread_search) {
 
 void* parse_csv(void* filepath_temp) {
   char* filepath = (char*)filepath_temp;
-  
+
   //printf("PARSING FILE: $%s$\n", filepath);
-  
+
   //opens the .csv file to be read
   FILE *fp = fopen(filepath, "r");
-  
+
   free(filepath);
-  
+
   char temp[1000];
-  
+
   //checks if the header is properly formatted
   char header[1000];
   char header_print[1000];
@@ -324,7 +333,7 @@ void* parse_csv(void* filepath_temp) {
     }
     i_header++;
   }
-  
+
   //int row_count=0;
   pthread_mutex_lock(&store_data);
   while(fgets(temp,1000,fp)) {
@@ -332,7 +341,7 @@ void* parse_csv(void* filepath_temp) {
     char *token;
     int i=0;
     //printf("before lock\n");
-    
+
     if (row_count==(num_rows-1)) {
       num_rows=num_rows*2;
       data=(row_data*)realloc(data,num_rows*sizeof(row_data));
@@ -344,7 +353,7 @@ void* parse_csv(void* filepath_temp) {
       token=strsep(&line, ",");
       char *trimmed = (char*)malloc(sizeof(char)*500);
       trimmed[0]='\0';
-      
+
       //checks if there are quotes around movie_title column signifying commas
       //trims whitespace for movie_titles that have quotes/commas
       if (i==11 && isQuote(token)) {
@@ -368,7 +377,7 @@ void* parse_csv(void* filepath_temp) {
         free(temp);
         free(forward);
       }
-      
+
       //trims whitepsace for all inputs
       int start = 0;
       int end = strlen(token)-1;
@@ -385,7 +394,7 @@ void* parse_csv(void* filepath_temp) {
         if (token[j+1]=='\n') continue;
         trimmed[j-start]=token[j];
       }
-      
+
       //for strings, if a data point is empty, it saves it as an empty string
       //for integers/doubles, if a data point is empty, it saves it as -99999, temporarily
       if (!strcmp(trimmed,"") || !strcmp(trimmed," ")) {
@@ -479,25 +488,25 @@ void sort_csv() {
 
 void print_csv(int* pid) {
   char *new_file_path = (char*)malloc(sizeof(char)*500);
-  
+
   // if (o) {
   //   strcpy(new_file_path, output_dir);
   //   strcat(new_file_path, "/Allfiles-sorted-");
   // }
   // else strcpy(new_file_path, "Allfiles-sorted-");
-  
+
   //create new sorted file path
   char myguy[16];
   sprintf(myguy, "%d", *pid);
   strcpy(new_file_path, myguy);
-  strcat(new_file_path, "/Allfiles.csv");  
+  strcat(new_file_path, "/Allfiles.csv");
   //printf("%s\n", new_file_path);
-  
+
   //create file stream
   FILE *fp = fopen(new_file_path, "w");
-  
+
   free(new_file_path);
-  
+
   //prints the sorted csv data to respective file
   //fprintf(fp, "%s",file->header);
   //printf("hello1\n");
@@ -511,75 +520,75 @@ void print_csv(int* pid) {
   for(z=0; z<=(row_count-1); z++) {
     //printf("printing row # %d\n", z);
     fprintf(fp, "%s,",data[z].color);
-    
+
     fprintf(fp, "%s,",data[z].director_name);
-    
+
     if (data[z].num_critic_for_reviews==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].num_critic_for_reviews);
-    
+
     if (data[z].duration==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].duration);
-    
+
     if (data[z].director_facebook_likes==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].director_facebook_likes);
-    
+
     if (data[z].actor_3_facebook_likes==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].actor_3_facebook_likes);
-    
+
     fprintf(fp, "%s,",data[z].actor_2_name);
-    
+
     if (data[z].actor_1_facebook_likes==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].actor_1_facebook_likes);
-    
+
     if (data[z].gross==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].gross);
-    
+
     fprintf(fp, "%s,",data[z].genres);
-    
+
     fprintf(fp, "%s,",data[z].actor_1_name);
-    
+
     if (data[z].quote) fprintf(fp,"\"%s\",", data[z].movie_title);
     else fprintf(fp, "%s,",data[z].movie_title);
-    
+
     if (data[z].num_voted_users==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].num_voted_users);
-    
+
     if (data[z].cast_total_facebook_likes==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].cast_total_facebook_likes);
-    
+
     fprintf(fp, "%s,",data[z].actor_3_name);
-    
+
     if (data[z].facenumber_in_poster==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].facenumber_in_poster);
-    
+
     fprintf(fp, "%s,",data[z].plot_keywords);
-    
+
     fprintf(fp, "%s,",data[z].movie_imdb_link);
-    
+
     if (data[z].num_user_for_reviews==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].num_user_for_reviews);
-    
+
     fprintf(fp, "%s,",data[z].language);
-    
+
     fprintf(fp, "%s,",data[z].country);
-    
+
     fprintf(fp, "%s,",data[z].content_rating);
-    
+
     if (data[z].budget==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].budget);
-    
+
     if (data[z].title_year==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].title_year);
-    
+
     if (data[z].actor_2_facebook_likes==-99999) fprintf(fp, ",");
     else fprintf(fp, "%d,",data[z].actor_2_facebook_likes);
-    
+
     if (data[z].imdb_score==-99999) fprintf(fp, ",");
     else fprintf(fp, "%lf,",data[z].imdb_score);
-    
+
     if (data[z].aspect_ratio==-99999) fprintf(fp, ",");
     else fprintf(fp, "%lf,",data[z].aspect_ratio);
-    
+
     fprintf(fp, "%d\n",data[z].movie_facebook_likes);
   }
   fclose(fp);
