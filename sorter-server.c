@@ -11,8 +11,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ip.h> /* superset of previous */
 #include "sorter-server.h"
 #include "mergesort.c"
+#include "arpa/inet.h"
 #define col_count 28
 
 pthread_mutex_t sock_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -48,11 +50,20 @@ int main(int argc, char *argv[])
      clilen = htonl(sizeof(cli_addr));
      threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
      threadCount = -1;
+     printf("Received connections from:");
+     fflush(stdout);
      while(1){
        //spawn a new thread for each socket
        int * sock_fd = malloc(sizeof(int));
        int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
        *sock_fd = newsockfd;
+
+       struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&cli_addr;
+       struct in_addr ipAddr = pV4Addr->sin_addr;
+       char str[INET_ADDRSTRLEN];
+       inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
+       printf(" %s,",inet_ntoa(ipAddr));
+       fflush(stdout);
 
        pthread_t thr;
        //race condition where newsock is changed before it gets dereferenced by file handler
