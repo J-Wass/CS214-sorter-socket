@@ -53,15 +53,14 @@ int main(int argc, char ** argv){
     }
     strcpy(inDir, argv[8]);
   }
-
-  if(argc == 10){
+  printf("%d\n", argc);
+  if(argc == 11){
     if(strcmp("-o",argv[9]) != 0){
       fprintf(stderr, "Expecting -o flag. Usage is ./client -c [sortcol] -h [host] -p [port number] -d [in directory] -o [out directory]\n");
       return 0;
     }
     strcpy(outDir, argv[10]);
   }
-
   //parse sort by column into an int
   if(strcmp(sortByCol,  "color")==0) sortInt=0;
   else if(strcmp(sortByCol, "director_name")==0) sortInt=1;
@@ -111,7 +110,6 @@ int main(int argc, char ** argv){
   //dont really need outputDir or outDir atm...
   pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
   threadCount = -1;
-  printf("output: %s\n", outDir);
   sortCSVs(inputDir, inDir, outputDir, outDir, threads, 1, sortByCol);
   //create another socket request for the all-sorted.csv and write it to outdir now
   closedir(inputDir);
@@ -194,21 +192,16 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
     write(sockfd,&sortInt,sizeof(int));
 
     long buffSizeDoe;
-    printf("waiting to read\n");
     read(sockfd, &buffSizeDoe, 8);
-    printf("%d\n", buffSizeDoe);
     char buffer[buffSizeDoe+1];
     read(sockfd, buffer, buffSizeDoe);
-    puts(buffer);
     buffer[buffSizeDoe] = '\0';
 
     char *filepath2 = (char*)malloc(sizeof(char)*500);
     strcpy(filepath2, outDir);
-    puts(outDir);
     strcat(filepath2, "/AllFiles-sorted-");
     strcat(filepath2, sorting);
     strcat(filepath2, ".csv");
-    puts(filepath2);
     FILE* fileDoe = fopen(filepath2, "w");
     fwrite(buffer, sizeof(char), buffSizeDoe, fileDoe);
     fflush(fileDoe);

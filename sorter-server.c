@@ -79,9 +79,7 @@ void* FileHandler(void * socket){
   int flag = 0;
   int OGsock = newsock;
 
-  puts("waiting for flag");
   read(newsock,&flag,4); //get flag
-  puts("got flag :)");
   newsock = OGsock;
   read(newsock,pid,4); //get pid
   newsock = OGsock;
@@ -142,16 +140,9 @@ void* FileHandler(void * socket){
     long buffSize = ftell(Allfiles);
     fseek(Allfiles, 0, SEEK_SET);
     char * buffer = malloc(sizeof(char)*buffSize);
-    puts("1");
     fread(buffer, buffSize, sizeof(char),Allfiles);
-    puts("2");
-
     write(newsock, &buffSize, sizeof(long));
-    puts("3");
-
     write(newsock, buffer, buffSize);
-    puts("4");
-
     fclose(Allfiles);
 
     free(pid);
