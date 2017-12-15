@@ -155,7 +155,7 @@ void* FileHandler(void * socket){
     write(newsock, &buffSize, sizeof(long));
     //printf("allfiles size: %ld\n", buffSize);
     int n = write(newsock, buffer, buffSize);
-    //printf("I wrote %d bytes!\n", n);
+    printf("I wrote %d bytes!\n", n);
     fclose(Allfiles);
 
     free(pid);
@@ -165,9 +165,15 @@ void* FileHandler(void * socket){
     read(newsock,&fileSize,8); //get size of incoming file
     newsock = OGsock;
     char buffer[fileSize+1];
-    bzero(buffer, fileSize);
-    int n = read(newsock, buffer,fileSize); //load file into buffer
-    //printf("read %d bytes vs %d filesize\n", n, fileSize);
+    bzero(buffer, fileSize+1);
+    int f = fileSize;
+    int remainder = 0;
+    while(f > 128){
+      remainder = fileSize - f;
+      int n = read(newsock, buffer+remainder,128);
+      f = f-128;
+    }
+    read(newsock, buffer+remainder,f);
     newsock = OGsock;
 
     //write each received file to hard drive
@@ -176,7 +182,7 @@ void* FileHandler(void * socket){
 
     char saak[16];
     sprintf(pstring, "%d", *pid);
-    sprintf(saak, "%d", (int)pthread_self());
+    sprintf(saak, "%u", (int)pthread_self());
 
     struct stat st = {0};
     if(stat(pstring, &st) == -1){
@@ -191,7 +197,7 @@ void* FileHandler(void * socket){
 
     FILE *fp = fopen(fileName, "w");
     if(fwrite(buffer, sizeof(char), fileSize, fp) != fileSize){
-      printf("ERROR WRITING FILE");
+      printf("ERROR WRITING FILE :(");
     };
     fflush(fp);
     fclose(fp);
@@ -277,7 +283,7 @@ void traverse_dir(char *search_dir){
         pthread_create(&threads[thread_count], NULL, thread_traverse_dir, (void *)new_search_dir);
       }
       else {
-        fprintf(stdout, "Our Program does not run well when it has to deal with more than 1022 threads. Exiting Now.\n");
+        fprintf(stdout, "Our Program does not run well when it has to deal with more than 1022 threads. Exiting Now :(.\n");
         exit(0);
       }
       pthread_mutex_unlock(&store_threads);
@@ -317,7 +323,6 @@ void* parse_csv(void* filepath_temp) {
   //opens the .csv file to be read
   FILE *fp = fopen(filepath, "r");
 
-  free(filepath);
 
   char temp[1000];
 
@@ -334,7 +339,7 @@ void* parse_csv(void* filepath_temp) {
     if (i_header==col_count || strcmp(headers[i_header],header_token)) {
       fclose(fp);
       pthread_exit(NULL);
-      return;
+      return NULL;
     }
     i_header++;
   }
@@ -657,7 +662,7 @@ void print_csv(int* pid) {
     if (data[z].aspect_ratio==-99999) fprintf(fp, ",");
     else fprintf(fp, "%lf,",data[z].aspect_ratio);
 
-    fprintf(fp, "%d\n",data[z].movie_facebook_likes);
+    fprintf(fp, "%ld\n",data[z].movie_facebook_likes);
   }
   fclose(fp);
 }
