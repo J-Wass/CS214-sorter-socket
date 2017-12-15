@@ -155,9 +155,9 @@ void* FileHandler(void * socket){
     write(newsock, &buffSize, sizeof(long));
     //printf("allfiles size: %ld\n", buffSize);
     int n = write(newsock, buffer, buffSize);
-    printf("I wrote %d bytes!\n", n);
     fclose(Allfiles);
-
+    remove(filepath);
+    rmdir(myburpman);
     free(pid);
     free(data);
   }
@@ -362,7 +362,7 @@ void* parse_csv(void* filepath_temp) {
     while (i<col_count) {
       //extracts a token
       token=strsep(&line, ",");
-      char *trimmed = (char*)malloc(sizeof(char)*500);
+      char *trimmed = (char*)calloc(500, sizeof(char));
       trimmed[0]='\0';
 
       if (!token) {
@@ -497,6 +497,7 @@ void* parse_csv(void* filepath_temp) {
   free(filepath);
   pthread_exit(NULL);
 }
+
 
 /*---------------------------------------------------------------*/
 

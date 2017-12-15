@@ -192,7 +192,7 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
 
     long buffSizeDoe;
     read(sockfd, &buffSizeDoe, 8);
-    char buffer[buffSizeDoe+1];
+    char * buffer = malloc(buffSizeDoe + 1);
     bzero(buffer,buffSizeDoe+1);
     int f = buffSizeDoe;
     int remainder = 0;
@@ -203,7 +203,6 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
       f = f-128;
     }
     bitez += read(sockfd, buffer+remainder,f);
-    printf("I read %d bytes!!! (i want %ld bytes)\n", bitez, buffSizeDoe);
     buffer[buffSizeDoe] = '\0';
 
     char *filepath2 = (char*)malloc(sizeof(char)*500);
