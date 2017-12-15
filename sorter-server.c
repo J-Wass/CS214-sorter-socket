@@ -323,7 +323,6 @@ void* parse_csv(void* filepath_temp) {
   //opens the .csv file to be read
   FILE *fp = fopen(filepath, "r");
 
-
   char temp[1000];
 
   //checks if the header is properly formatted
@@ -338,6 +337,8 @@ void* parse_csv(void* filepath_temp) {
     if (i_header==27) header_token[strlen(header_token)-2]='\0';
     if (i_header==col_count || strcmp(headers[i_header],header_token)) {
       fclose(fp);
+      remove(filepath);
+      free(filepath);
       pthread_exit(NULL);
       return NULL;
     }
@@ -351,6 +352,7 @@ void* parse_csv(void* filepath_temp) {
     char *token;
     int i=0;
     //printf("before lock\n");
+
     if (row_count==(num_rows-1)) {
       num_rows=num_rows*2;
       data=(row_data*)realloc(data,num_rows*sizeof(row_data));
@@ -363,119 +365,65 @@ void* parse_csv(void* filepath_temp) {
       char *trimmed = (char*)malloc(sizeof(char)*500);
       trimmed[0]='\0';
 
-      //checks if there are quotes around movie_title column signifying commas
-      //trims whitespace for movie_titles that have quotes/commas
-      if (i==11 && isQuote(token)) {
-        data[row_count].quote=1;
-        char *forward = (char*)malloc(sizeof(char)*500);
-        forward[0]='\0';
-        strcat(forward, token);
-        strcat(forward,",");
-        do {
-          token=strsep(&line, ",");
-          strcat(forward, token);
-          if (!isQuote(token)) strcat(forward, ",");
-        } while (!isQuote(token));
-        char *temp = (char*)malloc(sizeof(char*)*500);
-        temp[0]='\0';
-        int q;
-        for(q=1;q<strlen(forward)-1;q++) {
-          temp[q-1]=forward[q];
-        }
-        token=temp;
-        free(temp);
-        free(forward);
-      }
-
-      //trims whitepsace for all inputs
-      int start = 0;
-      //printf("$%s$\n", token);
-      if(!token){
-        switch(i) {
-          case 0:
-            strcpy(data[row_count].color,"");
-          case 1:
-            strcpy(data[row_count].director_name,"");
-          case 2:
-            data[row_count].num_critic_for_reviews = -99999;
-          case 3:
-            data[row_count].duration = -99999;
-          case 4:
-            data[row_count].director_facebook_likes = -99999;
-          case 5:
-            data[row_count].actor_3_facebook_likes = -99999;
-          case 6:
-            strcpy(data[row_count].actor_2_name,"");
-          case 7:
-            data[row_count].actor_1_facebook_likes = -99999;
-          case 8:
-            data[row_count].gross = -99999;
-          case 9:
-            strcpy(data[row_count].genres,"");
-          case 10:
-            strcpy(data[row_count].actor_1_name,"");
-          case 11:
-            strcpy(data[row_count].movie_title,"");
-          case 12:
-            data[row_count].num_voted_users = -99999;
-          case 13:
-            data[row_count].cast_total_facebook_likes = -99999;
-          case 14:
-            strcpy(data[row_count].actor_3_name,"");
-          case 15:
-            data[row_count].facenumber_in_poster = -99999;
-          case 16:
-            strcpy(data[row_count].plot_keywords,"");
-          case 17:
-            strcpy(data[row_count].movie_imdb_link,"");
-          case 18:
-            data[row_count].num_user_for_reviews = -99999;
-          case 19:
-            strcpy(data[row_count].language,"");
-          case 20:
-            strcpy(data[row_count].country,"");
-          case 21:
-            strcpy(data[row_count].content_rating,"");
-          case 22:
-            data[row_count].budget = -99999;
-          case 23:
-            data[row_count].title_year = -99999;
-          case 24:
-            data[row_count].actor_2_facebook_likes = -99999;
-          case 25:
-            sscanf("-99999", "%lf", &data[row_count].imdb_score);
-          case 26:
-            sscanf("-99999", "%lf", &data[row_count].aspect_ratio);
-          case 27:
-            data[row_count].movie_facebook_likes = -99999;
-        }
-        i++;
-        trimmed='\0';
-        free(trimmed);
-        continue;
-      }
-      int end = strlen(token)-1;
-      while(token[start]==' ') {
-        if (start==end) trimmed[0]=' ';
-        start++;
-      }
-      while(token[end]==' ') {
-        if (start==end) trimmed[0]=' ';
-        end--;
-      }
-      int j;
-      for(j=start; j<=end; j++) {
-        if (token[j+1]=='\n') continue;
-        trimmed[j-start]=token[j];
-      }
-
-      //for strings, if a data point is empty, it saves it as an empty string
-      //for integers/doubles, if a data point is empty, it saves it as -99999, temporarily
-      if (!strcmp(trimmed,"") || !strcmp(trimmed," ")) {
+      if (!token) {
+        //printf("NULL TOKEN: $%s$\n", token);
         if (i==0 || i==1 || i==6 || i==9 || i==10 || i==11 || i==14 || i==16 || i==17 || i==19 || i==20 || i==21)
-          trimmed="";
+            trimmed="";
         else
-          trimmed="-99999";
+            trimmed="-99999";
+      }
+
+      else {
+        //checks if there are quotes around movie_title column signifying commas
+        //trims whitespace for movie_titles that have quotes/commas
+        if (i==11 && isQuote(token)) {
+          data[row_count].quote=1;
+          char *forward = (char*)malloc(sizeof(char)*500);
+          forward[0]='\0';
+          strcat(forward, token);
+          strcat(forward,",");
+          do {
+            token=strsep(&line, ",");
+            strcat(forward, token);
+            if (!isQuote(token)) strcat(forward, ",");
+          } while (!isQuote(token));
+          char *temp = (char*)malloc(sizeof(char*)*500);
+          temp[0]='\0';
+          int q;
+          for(q=1;q<strlen(forward)-1;q++) {
+            temp[q-1]=forward[q];
+          }
+          token=temp;
+          free(temp);
+          free(forward);
+        }
+
+        //trims whitepsace for all inputs
+        int start = 0;
+        int end = strlen(token)-1;
+        //printf("end: %d - $%s$\n", end, token);
+        while(token[start]==' ') {
+          if (start==end) trimmed[0]=' ';
+          start++;
+        }
+        while(token[end]==' ') {
+          if (start==end) trimmed[0]=' ';
+          end--;
+        }
+        int j;
+        for(j=start; j<=end; j++) {
+          if (token[j+1]=='\n') continue;
+          trimmed[j-start]=token[j];
+        }
+
+        //for strings, if a data point is empty, it saves it as an empty string
+        //for integers/doubles, if a data point is empty, it saves it as -99999, temporarily
+        if (!strcmp(trimmed,"") || !strcmp(trimmed," ")) {
+          if (i==0 || i==1 || i==6 || i==9 || i==10 || i==11 || i==14 || i==16 || i==17 || i==19 || i==20 || i==21)
+            trimmed="";
+          else
+            trimmed="-99999";
+        }
       }
       //printf("before: %d %d %d\n", num_rows, row_count, i);
       //assigns token to respective struct variable
@@ -545,6 +493,8 @@ void* parse_csv(void* filepath_temp) {
   }
   pthread_mutex_unlock(&store_data);
   fclose(fp);
+  remove(filepath);
+  free(filepath);
   pthread_exit(NULL);
 }
 
