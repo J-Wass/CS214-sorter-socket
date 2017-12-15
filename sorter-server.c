@@ -146,14 +146,16 @@ void* FileHandler(void * socket){
     strcpy(filepath, myburpman);
     strcat(filepath, "/Allfiles.csv");
     FILE* Allfiles = fopen(filepath, "r");
-    fseek(Allfiles, 0, SEEK_END);
+    fseeko(Allfiles, 0, SEEK_END);
 
-    long buffSize = ftell(Allfiles);
-    fseek(Allfiles, 0, SEEK_SET);
+    long buffSize = ftello(Allfiles);
+    fseeko(Allfiles, 0, SEEK_SET);
     char * buffer = malloc(sizeof(char)*buffSize);
     fread(buffer, buffSize, sizeof(char),Allfiles);
     write(newsock, &buffSize, sizeof(long));
-    write(newsock, buffer, buffSize);
+    //printf("allfiles size: %ld\n", buffSize);
+    int n = write(newsock, buffer, buffSize);
+    //printf("I wrote %d bytes!\n", n);
     fclose(Allfiles);
 
     free(pid);
@@ -164,7 +166,8 @@ void* FileHandler(void * socket){
     newsock = OGsock;
     char buffer[fileSize+1];
     bzero(buffer, fileSize);
-    read(newsock, buffer,fileSize); //load file into buffer
+    int n = read(newsock, buffer,fileSize); //load file into buffer
+    //printf("read %d bytes vs %d filesize\n", n, fileSize);
     newsock = OGsock;
 
     //write each received file to hard drive
@@ -173,7 +176,7 @@ void* FileHandler(void * socket){
 
     char saak[16];
     sprintf(pstring, "%d", *pid);
-    sprintf(saak, "%d", OGsock);
+    sprintf(saak, "%d", (int)pthread_self());
 
     struct stat st = {0};
     if(stat(pstring, &st) == -1){
@@ -187,10 +190,10 @@ void* FileHandler(void * socket){
     strcat(fileName, ".csv");
 
     FILE *fp = fopen(fileName, "w");
-
-    fwrite(buffer, sizeof(char), fileSize, fp);
+    if(fwrite(buffer, sizeof(char), fileSize, fp) != fileSize){
+      printf("ERROR WRITING FILE");
+    };
     fflush(fp);
-
     fclose(fp);
     //printf("%d - buffer:\n%s\n",newsock,buffer);
     //run buffer through the mergesort and attach it to the circular linked list
@@ -343,7 +346,6 @@ void* parse_csv(void* filepath_temp) {
     char *token;
     int i=0;
     //printf("before lock\n");
-
     if (row_count==(num_rows-1)) {
       num_rows=num_rows*2;
       data=(row_data*)realloc(data,num_rows*sizeof(row_data));
@@ -382,6 +384,71 @@ void* parse_csv(void* filepath_temp) {
 
       //trims whitepsace for all inputs
       int start = 0;
+      //printf("$%s$\n", token);
+      if(!token){
+        switch(i) {
+          case 0:
+            strcpy(data[row_count].color,"");
+          case 1:
+            strcpy(data[row_count].director_name,"");
+          case 2:
+            data[row_count].num_critic_for_reviews = -99999;
+          case 3:
+            data[row_count].duration = -99999;
+          case 4:
+            data[row_count].director_facebook_likes = -99999;
+          case 5:
+            data[row_count].actor_3_facebook_likes = -99999;
+          case 6:
+            strcpy(data[row_count].actor_2_name,"");
+          case 7:
+            data[row_count].actor_1_facebook_likes = -99999;
+          case 8:
+            data[row_count].gross = -99999;
+          case 9:
+            strcpy(data[row_count].genres,"");
+          case 10:
+            strcpy(data[row_count].actor_1_name,"");
+          case 11:
+            strcpy(data[row_count].movie_title,"");
+          case 12:
+            data[row_count].num_voted_users = -99999;
+          case 13:
+            data[row_count].cast_total_facebook_likes = -99999;
+          case 14:
+            strcpy(data[row_count].actor_3_name,"");
+          case 15:
+            data[row_count].facenumber_in_poster = -99999;
+          case 16:
+            strcpy(data[row_count].plot_keywords,"");
+          case 17:
+            strcpy(data[row_count].movie_imdb_link,"");
+          case 18:
+            data[row_count].num_user_for_reviews = -99999;
+          case 19:
+            strcpy(data[row_count].language,"");
+          case 20:
+            strcpy(data[row_count].country,"");
+          case 21:
+            strcpy(data[row_count].content_rating,"");
+          case 22:
+            data[row_count].budget = -99999;
+          case 23:
+            data[row_count].title_year = -99999;
+          case 24:
+            data[row_count].actor_2_facebook_likes = -99999;
+          case 25:
+            sscanf("-99999", "%lf", &data[row_count].imdb_score);
+          case 26:
+            sscanf("-99999", "%lf", &data[row_count].aspect_ratio);
+          case 27:
+            data[row_count].movie_facebook_likes = -99999;
+        }
+        i++;
+        trimmed='\0';
+        free(trimmed);
+        continue;
+      }
       int end = strlen(token)-1;
       while(token[start]==' ') {
         if (start==end) trimmed[0]=' ';
@@ -520,7 +587,6 @@ void print_csv(int* pid) {
 
   int z;
   for(z=0; z<=(row_count-1); z++) {
-    //printf("printing row # %d\n", z);
     fprintf(fp, "%s,",data[z].color);
 
     fprintf(fp, "%s,",data[z].director_name);

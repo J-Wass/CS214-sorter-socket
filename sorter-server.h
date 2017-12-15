@@ -99,6 +99,9 @@ row_data *data;
 
 //function that returns 1 if given string has a quote and 0 if it does not
 int isQuote(char* token) {
+  if(!token){
+    return 0;
+  }
   int length = strlen(token);
   int i;
   for (i=0; i<length; i++) if (token[i]=='"') return 1;

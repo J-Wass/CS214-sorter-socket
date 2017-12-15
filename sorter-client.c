@@ -53,7 +53,6 @@ int main(int argc, char ** argv){
     }
     strcpy(inDir, argv[8]);
   }
-  printf("%d\n", argc);
   if(argc == 11){
     if(strcmp("-o",argv[9]) != 0){
       fprintf(stderr, "Expecting -o flag. Usage is ./client -c [sortcol] -h [host] -p [port number] -d [in directory] -o [out directory]\n");
@@ -194,7 +193,8 @@ void sortCSVs(DIR * inputDir, char * inDir, DIR * outputDir, char * outDir, pthr
     long buffSizeDoe;
     read(sockfd, &buffSizeDoe, 8);
     char buffer[buffSizeDoe+1];
-    read(sockfd, buffer, buffSizeDoe);
+    int n = read(sockfd, buffer, buffSizeDoe);
+    //printf("I read %d bytes!!! (i want %ld bytes)\n", n, buffSizeDoe);
     buffer[buffSizeDoe] = '\0';
 
     char *filepath2 = (char*)malloc(sizeof(char)*500);
@@ -243,16 +243,15 @@ void* FileSortHandler(void * filename){
   }
   int pid = getpid();
   int sortingInt = sortInt;
-  fseek(sortFile, 0, SEEK_END);
-  long bufsize = ftell(sortFile);
-  fseek(sortFile, 0, SEEK_SET);
+  fseeko(sortFile, 0, SEEK_END);
+  long bufsize = ftello(sortFile);
+  fseeko(sortFile, 0, SEEK_SET);
   char * buffer = malloc(sizeof(char)*bufsize);
   fread(buffer, bufsize, sizeof(char),sortFile);
-  printf("(%d) sending\n", pid);
   int flag = 0;
   write(sockfd,&flag,sizeof(flag));
   write(sockfd,&pid,sizeof(pid)); //pid
-  printf("sortint: %d\n", sortingInt);
+  //printf("pid: %d\n", pid);
   write(sockfd,&sortingInt,sizeof(sortingInt)); //sort int
   write(sockfd, &bufsize, sizeof(long)); //size of file
   write(sockfd, buffer, bufsize); //file
